@@ -18,8 +18,10 @@ if [ $UID == 0 ] ; then
     fi
 
     # Exec the command as NB_USER
+    cd $HOME
     exec su $NB_USER -c "env PATH=$PATH $*"
 else
     # Exec the command
+    cd $HOME
     exec $*
 fi

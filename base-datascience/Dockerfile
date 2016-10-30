@@ -1,5 +1,5 @@
 # Debian Jessie image released 2016 May 03.
-FROM debian@sha256:32a225e412babcd54c0ea777846183c61003d125278882873fb2bc97f9057c51
+FROM debian:stretch
 
 MAINTAINER Luca Minello <luca.minello@gmail.com>
 
@@ -8,10 +8,8 @@ USER root
 # Install all OS dependencies for notebook server that starts but lacks all
 # features (e.g., download as all possible file formats)
 ENV DEBIAN_FRONTEND noninteractive
-RUN REPO=http://cdn-fastly.deb.debian.org \
- && echo "deb $REPO/debian jessie main\ndeb $REPO/debian-security jessie/updates main" > /etc/apt/sources.list \
- && apt-get update && apt-get -yq dist-upgrade \
- && apt-get install -yq --no-install-recommends \
+RUN apt-get update && apt-get -yq dist-upgrade \
+    && apt-get install -yq --no-install-recommends \
     wget \
     bzip2 \
     ca-certificates \
@@ -19,7 +17,6 @@ RUN REPO=http://cdn-fastly.deb.debian.org \
     locales \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
-
 
 # Install all OS dependencies for fully functional notebook server
 RUN apt-get update && apt-get install -yq --no-install-recommends \
@@ -78,24 +75,57 @@ RUN apt-get update && apt-get install -yq --no-install-recommends \
     xvfb \
     zlib1g-dev \
     unixodbc-dev \
+    ca-certificates \
+    file \
+    git \
+    libapparmor1 \
+    libedit2 \
+    libcurl4-openssl-dev \
+    libssl1.0.2 \
+    libssl-dev \
+    psmisc \
+    python-setuptools \
     && apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-## Use s6
-RUN wget -P /tmp/ https://github.com/just-containers/s6-overlay/releases/download/v1.18.1.5/s6-overlay-amd64.tar.gz \
-  && tar xzf /tmp/s6-overlay-amd64.tar.gz -C /
+ADD http://security.debian.org/debian-security/pool/updates/main/o/openssl/libssl1.0.0_1.0.1t-1+deb8u5_amd64.deb /tmp
+RUN dpkg -i /tmp/libssl1.0.0_1.0.1t-1+deb8u5_amd64.deb
 
+# R pre-requisites
+RUN apt-get update && apt-get install -yq --no-install-recommends \
+    fonts-dejavu \
+    gfortran \
+    gcc \
+    procps && apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# libav-tools for matplotlib anim
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libav-tools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 # Switch back to $NB_USER to avoid accidental container runs as root
-USER $NB_USER
+#USER $NB_USER
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && \
-    locale-gen
+   locale-gen
+
+#RUN echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen \
+#    && locale-gen en_US.utf8 \
+#    && /usr/sbin/update-locale LANG=en_US.UTF-8
+
+ENV LC_ALL en_US.UTF-8
+ENV LANG en_US.UTF-8
 
 # Install Tini
 RUN wget --quiet https://github.com/krallin/tini/releases/download/v0.10.0/tini && \
     echo "1361527f39190a7338a0b434bd8c88ff7233ce7b9a4876f3315c22fce7eca1b0 *tini" | sha256sum -c - && \
-    mv tini /usr/local/bin/tini && \
-    chmod +x /usr/local/bin/tini
+    mv tini /usr/bin/tini && \
+    chmod +x /usr/bin/tini
+
+#Use S6
+ADD https://github.com/just-containers/s6-overlay/releases/download/v1.9.1.3/s6-overlay-amd64.tar.gz /tmp/
+RUN tar xzf /tmp/s6-overlay-amd64.tar.gz -C /
 
 
 # Configure environment
@@ -115,6 +145,8 @@ RUN useradd -m -s /bin/bash -N -u $NB_UID $NB_USER && \
     mkdir -p $CONDA_DIR && \
     chown $NB_USER $CONDA_DIR && \
     echo "$NB_USER:$NB_PASSWORD" | chpasswd
+
+RUN adduser $NB_USER sudo && echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
 
 USER $NB_USER
 
@@ -139,10 +171,13 @@ RUN cd /tmp && \
 # Stick with jpeg 8 to avoid problems with R packages
 RUN echo "jpeg 8*" >> /opt/conda/conda-meta/pinned
 
+#COPY userconf.sh /etc/cont-init.d/conf
+
 USER root
 
 # Configure container startup
-ENTRYPOINT ["tini", "--"]
-CMD ["id"]
+#ENTRYPOINT ["tini", "--"]
+ENTRYPOINT ["/init"]
+#CMD ["id"]
 
 USER $NB_USER

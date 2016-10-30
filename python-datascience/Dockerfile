@@ -1,25 +1,25 @@
-FROM rstudio-datascience
+FROM r-datascience
 
 MAINTAINER Luca Minello <luca.minello@gmail.com>
 
-USER root
-
-# libav-tools for matplotlib anim
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libav-tools && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
 
 USER $NB_USER
 
-# Install Jupyter notebook as jovyan
-RUN conda install --quiet --yes \
-    'notebook=4.2*' \
-    && conda clean -tipsy
+# Install Jupyter notebook
+ RUN conda install --quiet --yes \
+     'notebook' \
+     'nb_conda' \
+     && conda clean -tipsy
+
+ RUN conda install --quiet --yes -c anaconda-nb-extensions \
+     'nbbrowserpdf'\
+     'ipyparallel' && \
+     conda clean -tipsy
+
+# #RUN conda install -c anaconda 
 
 # Install JupyterHub to get the jupyterhub-singleuser startup script
 RUN pip --no-cache-dir install 'jupyterhub==0.5'
-
 
 # Install Python 3 packages
 # Remove pyqt and qt pulled in for matplotlib since we're only ever going to
@@ -43,11 +43,11 @@ RUN conda install --quiet --yes \
     'bokeh' \
     'sqlalchemy' \
     'hdf5' \
-    'h5py' && \
+    'h5py'  && \
     conda remove --quiet --yes --force qt pyqt && \
     conda clean -tipsy
 
-# Activate ipywidgets extension in the environment that runs the notebook server
+# # Activate ipywidgets extension in the environment that runs the notebook server
 RUN jupyter nbextension enable --py widgetsnbextension --sys-prefix
 
 # Install Python 2 packages
@@ -74,12 +74,16 @@ RUN conda create --quiet --yes -p $CONDA_DIR/envs/python2 python=2.7 \
     'hdf5' \
     'h5py' \
     'sqlalchemy' \
-    'pyzmq' && \
+    'pyzmq'  && \
     conda remove -n python2 --quiet --yes --force qt pyqt && \
     conda clean -tipsy
+
+# RUN jupyter nbextension enable --py widgetsnbextension --sys-prefix
+RUN ipcluster nbextension enable
 # Add shortcuts to distinguish pip for python2 and python3 envs
-RUN ln -s $CONDA_DIR/envs/python2/bin/pip $CONDA_DIR/bin/pip2 && \
-    ln -s $CONDA_DIR/bin/pip $CONDA_DIR/bin/pip3
+RUN ln -s $CONDA_DIR/envs/python2/bin/pip $CONDA_DIR/bin/pip2 
+#&& \
+    #ln -s $CONDA_DIR/envs/python3/bin/pip $CONDA_DIR/bin/pip
 
 # Import matplotlib the first time to build the font cache.
 ENV XDG_CACHE_HOME /home/$NB_USER/.cache/
@@ -96,16 +100,16 @@ USER root
 RUN $CONDA_DIR/envs/python2/bin/python -m ipykernel install
 
 EXPOSE 8888
-WORKDIR /home/$NB_USER/
+WORKDIR $HOME
 
-
-CMD ["start-notebook.sh"]
+COPY run.sh /etc/services.d/jupyter/run
 
 COPY start.sh /usr/local/bin/
 COPY start-notebook.sh /usr/local/bin/
 COPY start-singleuser.sh /usr/local/bin/
 COPY jupyter_notebook_config.py /home/$NB_USER/.jupyter/
 
-USER $NB_USER
+#USER $NB_USER
 
+#CMD ["start-notebook.sh"]
 #USER $NB_USER
