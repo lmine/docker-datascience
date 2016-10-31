@@ -9,28 +9,25 @@ USER $NB_USER
 # Pin r-base to a specific build number for https://github.com/jupyter/docker-stacks/issues/210#issuecomment-246081809
 RUN conda config --add channels r && \
     conda install --quiet --yes \
-    'r-base=3.3.1 1' \
-    'r-irkernel=0.7*' \
-    'r-plyr=1.8*' \
-    'r-devtools=1.11*' \
-    'r-dplyr=0.4*' \
-    'r-ggplot2=2.1*' \
-    'r-tidyr=0.5*' \
-    'r-shiny=0.13*' \
-    'r-rmarkdown=0.9*' \
-    'r-forecast=7.1*' \
-    'r-stringr=1.0*' \
-    'r-rsqlite=1.0*' \
-    'r-reshape2=1.4*' \
-    'r-nycflights13=0.2*' \
-    'r-caret=6.0*' \
-    'r-rcurl=1.95*' \
-    'r-crayon=1.3*' \
-    'r-randomforest=4.6*' && conda clean -tipsy
-
-RUN conda config --add channels r && \
-    conda install --quiet --yes \
-    'r-essentials=1.4.2'   && conda clean -tipsy
+    'r-base' \
+    'r-irkernel' \
+    'r-plyr' \
+    'r-devtools' \
+    'r-dplyr' \
+    'r-ggplot2' \
+    'r-tidyr' \
+    'r-shiny' \
+    'r-rmarkdown' \
+    'r-forecast' \
+    'r-stringr' \
+    'r-rsqlite' \
+    'r-reshape2' \
+    'r-nycflights13' \
+    'r-caret' \
+    'r-rcurl' \
+    'r-crayon' \
+    'r-essentials' \
+    'r-randomforest' && conda clean -tipsy
 
 USER root
 
@@ -64,9 +61,27 @@ RUN echo '\n\
 RUN echo "PATH=\"/usr/lib/rstudio-server/bin/:\${PATH}\"" >> /etc/R/Renviron.site
 
 
-COPY run.sh /etc/services.d/rstudio/run
+COPY rstudio.sh /etc/services.d/rstudio/run
 
 EXPOSE 8787
+
+# Download and install shiny server
+RUN wget --no-verbose https://s3.amazonaws.com/rstudio-shiny-server-os-build/ubuntu-12.04/x86_64/VERSION -O "version.txt" && \
+    VERSION=$(cat version.txt)  && \
+    wget --no-verbose "https://s3.amazonaws.com/rstudio-shiny-server-os-build/ubuntu-12.04/x86_64/shiny-server-$VERSION-amd64.deb" -O ss-latest.deb && \
+    dpkg -i ss-latest.deb && \
+    rm -f version.txt ss-latest.deb
+    #R -e "install.packages(c('shiny', 'rmarkdown'), repos='https://cran.rstudio.com/')" && \
+    #cp -R /usr/local/lib/R/site-library/shiny/examples/* /srv/shiny-server/
+
+EXPOSE 3838
+
+# Make sure the directory for individual app logs exists
+RUN mkdir -p /var/log/shiny-server && \
+    chown shiny.shiny /var/log/shiny-server
+
+COPY shiny-server.sh /etc/services.d/shiy-server/run
+
 WORKDIR $HOME
 
 #USER $NB_USER
